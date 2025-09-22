@@ -1,0 +1,8 @@
+__pycache__/
+
+/venv/
+# O365 credentials
+o365_token.txt
+
+# Environments
+.env
