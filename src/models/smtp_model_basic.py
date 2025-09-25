@@ -42,9 +42,7 @@ class EmailRequest(BaseModel):
                             },
                 "to": "usuario@dominio.com",
                 "cc": ["otro@dominio.com"],
-                "bcc": ["oculto@dominio.com"],
-                "adjuntos": ["archivos/reporte.pdf"],
-                "imagenes_embed": {"logo123": "static/images/logo.png"}
+                "bcc": ["oculto@dominio.com"]
             }
         }
 

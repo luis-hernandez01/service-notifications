@@ -9,6 +9,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.routes.send_routes import sendemail_routes
+from src.routes.send_dinamyc_routes import send_router
+
+
 from src.config.config import Base, engine
 
 Base.metadata.create_all(bind=engine)
@@ -45,3 +48,4 @@ allow_headers=["*"],           # Headers personalizados permitidos
 # registrando mis rutas existentes para el envio de correos SMTP
 # Aquí se incluyen las rutas definidas en la carpeta 'routes'.
 app.include_router(sendemail_routes)
+app.include_router(send_router)

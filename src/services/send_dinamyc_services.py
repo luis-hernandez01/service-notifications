@@ -4,15 +4,14 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 import asyncio, re
 from datetime import datetime
-from src.models.smtp_model_basic import EmailRequest
+from src.models.smtp_model import EmailRequest
 from src.models.plantilla_model import Plantillas
 from src.models.credenciales_model import CredencialesCorreo
 from src.models.logs_envio import LogsEnvio
 import shutil
 
 
-class O365EmailService:
-    
+class SendDinamycO365Service:
     def __init__(self, db: Session, req: EmailRequest):
         self.db = db
 
@@ -53,6 +52,13 @@ class O365EmailService:
         def build_and_send():
             try:
                 message = mailbox.new_message()
+                
+                # def render_template(template: str, variables: dict) -> str:
+                #     """Reemplaza {{llave}} en la plantilla con valores del JSON"""
+                #     html = template
+                #     for key, value in variables.items():
+                #         html = html.replace(f"{{{{{key}}}}}", str(value))
+                #     return html
                 
                 def render_template(template: str, variables: dict) -> str:
                     """Reemplaza {{etiqueta}} con todo el contenido del JSON convertido a HTML"""
@@ -112,10 +118,10 @@ class O365EmailService:
                     for adj in req.adjuntos:
                         path = Path(adj)
                         if path.exists():
-                            # Adjuntar al correo
+                            # ✅ Adjuntar al correo
                             message.attachments.add(path)
 
-                            # Guardar copia en uploads/adjuntos/AAAA-MM-DD/
+                            # ✅ Guardar copia en uploads/adjuntos/AAAA-MM-DD/
                             destino = today_dir / path.name
                             shutil.copy(path, destino)
 
@@ -123,6 +129,7 @@ class O365EmailService:
                             print(f"Adjunto copiado y guardado en: {destino}")
                         else:
                             print(f"Adjunto no encontrado: {adj}, ignorando...")
+            
 
                 # Imágenes
                 imagenes_guardadas = []
