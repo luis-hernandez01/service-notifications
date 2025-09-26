@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from src.models.plantilla_model import Plantillas
-from src.models.crud_model import CreateNotification,UpdateNotification
+from src.models.crud_notification_model import CreateNotification,UpdateNotification
 
 
 def consult_notifications(db: Session,skip: int = 0, limit: int = 10):
