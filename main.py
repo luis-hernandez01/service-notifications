@@ -8,8 +8,10 @@
 # dependencias usadas para este archivo raiz
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from src.routes.crud_templates_routes import crud_templates_routes
 from src.routes.send_routes import sendemail_routes
 from src.routes.send_dinamyc_routes import send_router
+from src.routes.crud_credentials_routes import crud_credentials_router
 
 
 from src.config.config import Base, engine
@@ -49,3 +51,5 @@ allow_headers=["*"],           # Headers personalizados permitidos
 # Aquí se incluyen las rutas definidas en la carpeta 'routes'.
 app.include_router(sendemail_routes)
 app.include_router(send_router)
+app.include_router(crud_templates_routes)
+app.include_router(crud_credentials_router)
