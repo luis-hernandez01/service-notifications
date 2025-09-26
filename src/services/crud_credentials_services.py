@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from src.models.credenciales_model import CredencialesCorreo
@@ -6,13 +7,16 @@ from src.schemas.crud_credentials_schema import CredentialsCreate, CredentialsUp
 
 def get_credential_by_id(db: Session, id: int):
     try:
-        return db.query(CredencialesCorreo).filter(CredencialesCorreo.id == id).first()
+        return db.query(CredencialesCorreo).filter(and_(CredencialesCorreo.activo == 1,CredencialesCorreo.id == id)).first()
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=f'Error al consultar por ID: {str(e)}')
+        raise HTTPException(
+            status_code=500, 
+            detail=f'Error al consultar por ID: {str(e)}'
+        )
 
 def get_all_credentials(db: Session, skip: int = 0, limit: int = 100):
     try: 
-        return db.query(CredencialesCorreo).offset(skip).limit(limit).all()
+        return db.query(CredencialesCorreo).filter(CredencialesCorreo.activo == 1).offset(skip).limit(limit).all()
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f'Error al listar credenciales: {str(e)}')
 
