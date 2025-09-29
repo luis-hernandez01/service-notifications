@@ -50,7 +50,7 @@ allow_headers=["*"],           # Headers personalizados permitidos
 
 # registrando mis rutas existentes para el envio de correos SMTP
 # Aquí se incluyen las rutas definidas en la carpeta 'routes'.
-app.mount("/redocs", get_scalar_api_reference())
+app.mount("/", get_scalar_api_reference())
 app.include_router(sendemail_routes)
 app.include_router(send_router)
 app.include_router(crud_templates_routes)
