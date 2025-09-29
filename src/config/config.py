@@ -14,8 +14,9 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
 # URL de conexión para PostgreSQL
 DATABASE_URL = (
-    f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
-    f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    f"postgresql+psycopg2://notifications:ka8z53PkKZE5uNmCAOyVA2nMbiHNpWE3@dpg-d3d8c3jipnbc73fck58g-a.frankfurt-postgres.render.com/notifications_si78"
+    # f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
+    # f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 )
 
 # Crear engine y sesión
