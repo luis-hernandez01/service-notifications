@@ -1,50 +1,32 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import List, Optional, Dict
+from fastapi import Form, File, UploadFile
+from typing import List, Optional
+import json
 
+class EmailRequest:
+    def __init__(
+        self,
+        identifying_name: str = Form(..., description="Identificador de plantilla"),
+        to: str = Form(..., description="Destinatario principal"),
+        subject: str = Form(..., description="Asunto del correo"),
+        body_html: str = Form(..., description="Cuerpo del correo (JSON string)"),
+        cc: Optional[List[str]] = Form(None, description="Lista de correos en copia"),
+        bcc: Optional[List[str]] = Form(None, description="Lista de correos en copia oculta"),
+        # Adjuntos (archivos normales)
+        adjuntos: Optional[List[UploadFile]] = File(None),
+        # Imágenes embebidas (archivos que se referencian con cid)
+        imagenes_embed: Optional[List[UploadFile]] = File(None),
+    ):
+        self.identifying_name = identifying_name
+        self.to = to
+        self.subject = subject
 
-class EmailRequest(BaseModel):
-#    DTO para la petición de envío de correo.
-#     Compatible con FastAPI y validación automática de Pydantic.
+        # body_html viene como string JSON → lo convertimos a dict
+        try:
+            self.body_html = json.loads(body_html)
+        except Exception:
+            self.body_html = {"raw": body_html}  # fallback si no es JSON válido
 
-    subject: str = Field(..., description="Asunto del correo")
-    body_html: Optional[Dict[str, str]] = Field(..., description="Cuerpo del correo en formato HTML")
-    to: str = Field(..., description="Destinatario principal del correo")
-    identifying_name: str = Field(..., description="Identificador de plantillas")
-    cc: Optional[List[str]] = Field(
-        default=None, description="Lista de destinatarios en copia"
-    )
-    bcc: Optional[List[str]] = Field(
-        default=None, description="Lista de destinatarios en copia oculta"
-    )
-    adjuntos: Optional[List[str]] = Field(
-        default=None,
-        description="Lista de rutas absolutas o relativas de archivos adjuntos",
-        example=["/path/to/file.pdf", "docs/manual.docx"],
-    )
-    imagenes_embed: Optional[Dict[str, str]] = Field(
-        default=None,
-        description="Diccionario con imágenes a embeber en el cuerpo del correo. "
-                    "Clave = Content-ID (cid), Valor = ruta al archivo de imagen.",
-        example={"logo123": "static/images/logo.png"},
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "identifying_name": "plantilla-notificacion",
-                "subject": "Prueba de correo",
-                # "body_html": "<h1>Hola</h1><p>Este es un correo de prueba con imagen embedida: <img src='cid:logo123'></p>",
-                "body_html": {
-                                "titulo": "Hola",
-                                "usuario": "Juan",
-                                "mensaje": "Este es un correo de prueba con parámetros dinámicos",
-                                "imagen": "cid:logo123"
-                            },
-                "to": "usuario@dominio.com",
-                "cc": ["otro@dominio.com"],
-                "bcc": ["oculto@dominio.com"],
-                "adjuntos": ["archivos/reporte.pdf"],
-                "imagenes_embed": {"logo123": "static/images/logo.png"}
-            }
-        }
-
+        self.cc = cc or []
+        self.bcc = bcc or []
+        self.adjuntos = adjuntos or []
+        self.imagenes_embed = imagenes_embed or []

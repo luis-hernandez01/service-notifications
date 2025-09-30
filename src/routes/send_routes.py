@@ -4,7 +4,7 @@ from src.services.send_services import O365EmailService
 from sqlalchemy.orm import Session
 from src.config.config import get_session
 
-sendemail_routes = APIRouter()
+sendemail_routes = APIRouter(tags=["Envio correo basico"])
 
 
 @sendemail_routes.post("/send-email")

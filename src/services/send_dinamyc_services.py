@@ -18,13 +18,16 @@ class SendDinamycO365Service:
         data = self.db.query(Plantillas).filter(
             Plantillas.identifying_name == req.identifying_name
         ).first()
+        
+        if not data:
+            raise HTTPException(status_code=404, detail=f"No se encontraron credenciales con identificador '{req.identifying_name}'")
 
         creds = self.db.query(CredencialesCorreo).filter(
             CredencialesCorreo.id == data.credenciales_id
         ).first()
 
-        if not data:
-            raise HTTPException(status_code=404, detail=f"No se encontraron credenciales con identificador '{req.identifying_name}'")
+        if not creds:
+            raise HTTPException(status_code=404, detail=f"No se encontraron credenciales con identificador '{data.credenciales_id}'")
 
         credentials = (creds.client_id, creds.client_secret)
 
@@ -53,13 +56,6 @@ class SendDinamycO365Service:
             try:
                 message = mailbox.new_message()
                 
-                # def render_template(template: str, variables: dict) -> str:
-                #     """Reemplaza {{llave}} en la plantilla con valores del JSON"""
-                #     html = template
-                #     for key, value in variables.items():
-                #         html = html.replace(f"{{{{{key}}}}}", str(value))
-                #     return html
-                
                 def render_template(template: str, variables: dict) -> str:
                     """Reemplaza {{etiqueta}} con todo el contenido del JSON convertido a HTML"""
                     if not isinstance(variables, dict):
@@ -79,7 +75,7 @@ class SendDinamycO365Service:
                     Plantillas.identifying_name == req.identifying_name
                 ).first()
                 contenido_html = dataplantilla.content_html if dataplantilla else req.body_html
-                # 👇 Si body_html es un dict, lo inyectamos
+                #  Si body_html es un dict, lo inyectamos
                 if isinstance(req.body_html, dict) and dataplantilla:
                     contenido_html = render_template(dataplantilla.content_html, req.body_html)
 
@@ -90,16 +86,21 @@ class SendDinamycO365Service:
 
                 if req.cc:
                     for cc in req.cc:
+                        if not cc:
+                            continue
                         if not self.validar_email(cc):
                             raise HTTPException(status_code=500, detail=f"Correo inválido en CC: {cc}")
-                        
                         message.cc.add(cc)
+
 
                 if req.bcc:
                     for bcc in req.bcc:
+                        if not bcc:  # 👈 evita procesar valores vacíos
+                            continue
                         if not self.validar_email(bcc):
                             raise HTTPException(status_code=500, detail=f"Correo inválido en BCC: {bcc}")
                         message.bcc.add(bcc)
+
 
                 # Contenido
                 message.subject = req.subject
@@ -112,36 +113,32 @@ class SendDinamycO365Service:
                 today_dir = UPLOAD_DIR / datetime.today().strftime("%Y-%m-%d")
                 today_dir.mkdir(parents=True, exist_ok=True)
                 
-                # Adjuntos
+                # Adjuntos (ya son UploadFile)
                 adjuntos_guardados = []
                 if req.adjuntos:
                     for adj in req.adjuntos:
-                        path = Path(adj)
-                        if path.exists():
-                            # ✅ Adjuntar al correo
-                            message.attachments.add(path)
+                        destino = today_dir / adj.filename
+                        with open(destino, "wb") as buffer:
+                            shutil.copyfileobj(adj.file, buffer)
 
-                            # ✅ Guardar copia en uploads/adjuntos/AAAA-MM-DD/
-                            destino = today_dir / path.name
-                            shutil.copy(path, destino)
+                        # adjuntar al correo
+                        message.attachments.add(str(destino))
+                        adjuntos_guardados.append(str(destino))
 
-                            adjuntos_guardados.append(str(destino))
-                            print(f"Adjunto copiado y guardado en: {destino}")
-                        else:
-                            print(f"Adjunto no encontrado: {adj}, ignorando...")
-            
-
-                # Imágenes
+                # Imágenes embed
                 imagenes_guardadas = []
                 if req.imagenes_embed:
-                    for cid, img_path in req.imagenes_embed.items():
-                        path = Path(img_path)
-                        if path.exists():
-                            attachment = message.attachments.add(path)
-                            if attachment:
-                                attachment.is_inline = True
-                                attachment.content_id = cid
-                                imagenes_guardadas.append(f"{cid}:{path}")
+                    for img in req.imagenes_embed:
+                        destino = today_dir / img.filename
+                        with open(destino, "wb") as buffer:
+                            shutil.copyfileobj(img.file, buffer)
+
+                        attachment = message.attachments.add(str(destino))
+                        if attachment:
+                            attachment.is_inline = True
+                            # usamos filename como cid
+                            attachment.content_id = img.filename
+                            imagenes_guardadas.append(f"{img.filename}:{destino}")
 
                 # Enviar
                 message.send()
@@ -151,7 +148,7 @@ class SendDinamycO365Service:
                     destinatario=req.to,
                     cc=";".join(req.cc) if req.cc else None,
                     bcc=";".join(req.bcc) if req.bcc else None,
-                    adjuntos=";".join(adjuntos_guardados) if adjuntos_guardados else None,
+                    adjuntos=";".join(adjuntos_guardados) if adjuntos_guardados else None,  # usamos rutas guardadas
                     num_adjuntos=len(adjuntos_guardados),
                     imagenes=";".join(imagenes_guardadas) if imagenes_guardadas else None,
                     num_imagenes=len(imagenes_guardadas),
@@ -162,6 +159,7 @@ class SendDinamycO365Service:
                     identificador=req.identifying_name,
                     detalle="Correo enviado correctamente"
                 )
+
                 self.db.add(log)
                 self.db.commit()
 
@@ -171,17 +169,18 @@ class SendDinamycO365Service:
                     destinatario=req.to,
                     cc=";".join(req.cc) if req.cc else None,
                     bcc=";".join(req.bcc) if req.bcc else None,
-                    adjuntos=";".join(req.adjuntos) if req.adjuntos else None,
+                    adjuntos=";".join([adj.filename for adj in req.adjuntos]) if req.adjuntos else None,  # 👈 filenames
                     num_adjuntos=len(req.adjuntos) if req.adjuntos else 0,
-                    imagenes=";".join([f"{cid}:{path}" for cid, path in (req.imagenes_embed or {}).items()]) if req.imagenes_embed else None,
+                    imagenes=";".join([img.filename for img in req.imagenes_embed]) if req.imagenes_embed else None,
                     num_imagenes=len(req.imagenes_embed) if req.imagenes_embed else 0,
                     asunto=req.subject,
                     contenido=req.body_html,
                     estado="ERROR",
                     fecha_envio=datetime.utcnow(),
                     identificador=req.identifying_name,
-                    detalle=str(e)  # aquí guardamos el error exacto
+                    detalle=str(e)
                 )
+
                 self.db.add(log)
                 self.db.commit()
                 raise

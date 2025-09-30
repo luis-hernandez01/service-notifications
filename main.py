@@ -21,20 +21,6 @@ Base.metadata.create_all(bind=engine)
 
 # Inicialización de la aplicación FastAPI
 app = FastAPI(title="SMTP Service", version="1.0.0")
-
-# from pathlib import Path
-
-# Incorrecto:
-# path = Path("file:///C:/Users/User/Pictures/Captura.PNG")
-
-# Correcto:
-# path = Path("C:/Users/User/Pictures/Captura.PNG")
-
-# Verificar si existe
-# print(path.exists())  # True si el archivo está allí
-
-
-
 # configuracion de CORS
 # permite que aplicaciones externas (por ejemplo, un frontend en Angular o React) 
 # puedan comunicarse con esta API.
@@ -46,12 +32,12 @@ allow_credentials=True,     # Permitir envío de cookies/autenticación
 allow_methods=["*"],        # se le esta dando permisos a todos los metodos existentes
 allow_headers=["*"],           # Headers personalizados permitidos
 )
-
-
 # registrando mis rutas existentes para el envio de correos SMTP
 # Aquí se incluyen las rutas definidas en la carpeta 'routes'.
-app.mount("/", get_scalar_api_reference())
+
 app.include_router(sendemail_routes)
 app.include_router(send_router)
 app.include_router(crud_templates_routes)
 app.include_router(crud_credentials_router)
+#  Documentación con Swagger/OpenAPI
+app.mount("/", get_scalar_api_reference())
