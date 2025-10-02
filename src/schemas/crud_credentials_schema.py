@@ -14,11 +14,11 @@ class CredentialsCreate(Credentials):
     pass
 
 class CredentialsUpdate(Credentials):
-    identificador: Optional[str]
-    client_id: Optional[str]
-    client_secret: Optional[str]
-    tenant_id: Optional[str]
-    username: Optional[str]
+    identificador: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    tenant_id: Optional[str] = None
+    username: Optional[str] = None
 
 class CredentialsOut(Credentials):
     id: int
