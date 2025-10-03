@@ -54,18 +54,77 @@ class O365EmailService:
             try:
                 message = mailbox.new_message()
                 
+                # def render_template(template: str, variables: dict) -> str:
+                #     """Reemplaza {{etiqueta}} con todo el contenido del JSON convertido a HTML"""
+                #     if not isinstance(variables, dict):
+                #         return template.replace("{{etiqueta}}", str(variables))
+
+                #     # Convertimos el dict en un bloque HTML (tabla simple)
+                #     rows = "".join(
+                #         f"<li><strong>{k}:</strong>{v}</li>" for k, v in variables.items()
+                #     )
+                #     html_table = f"{rows}"
+
+                #     return template.replace("{{etiqueta}}", html_table)
+                
+
+
                 def render_template(template: str, variables: dict) -> str:
-                    """Reemplaza {{etiqueta}} con todo el contenido del JSON convertido a HTML"""
-                    if not isinstance(variables, dict):
-                        return template.replace("{{etiqueta}}", str(variables))
+                    """
+                    Reemplaza:
+                    - {{campo}}             -> valor específico dentro del dict
+                    - {{etiqueta}}          -> todo el dict convertido a HTML
+                    - {{etiqueta.campo}}    -> valor específico dentro del dict
+                    - {{etiqueta.a.b.c}}    -> acceso anidado
+                    """
 
-                    # Convertimos el dict en un bloque HTML (tabla simple)
-                    rows = "".join(
-                        f"<li><strong>{k}:</strong>{v}</li>" for k, v in variables.items()
-                    )
-                    html_table = f"{rows}"
+                    def dict_to_html(data: dict) -> str:
+                        """Convierte un diccionario en lista HTML (recursivo)."""
+                        html = "<ul>"
+                        for k, v in data.items():
+                            if isinstance(v, dict):
+                                html += f"<li><strong>{k}:</strong> {dict_to_html(v)}</li>"
+                            else:
+                                html += f"<li><strong>{k}:</strong> {v}</li>"
+                        html += "</ul>"
+                        return html
 
-                    return template.replace("{{etiqueta}}", html_table)
+                    def resolve_path(data: dict, path: str):
+                        """Navega dentro de un dict siguiendo una ruta 'a.b.c'"""
+                        value = data
+                        for part in path.split("."):
+                            if isinstance(value, dict) and part in value:
+                                value = value[part]
+                            else:
+                                return None
+                        return value
+
+                    def replace_var(match):
+                        expr = match.group(1).strip()
+
+                        # {{etiqueta}} -> todo el JSON
+                        if expr == "etiqueta":
+                            return dict_to_html(variables)
+
+                        # {{etiqueta.algo}} (campos dentro del JSON)
+                        if expr.startswith("etiqueta."):
+                            path = expr.split(".", 1)[1]
+                            value = resolve_path(variables, path)
+                            return str(value) if value is not None else f"{{{{{expr}}}}}"
+
+                        # {{campo}} -> acceso directo
+                        if expr in variables:
+                            return str(variables[expr])
+
+                        return f"{{{{{expr}}}}}"  # lo dejamos igual si no existe
+
+                    return re.sub(r"{{\s*(.*?)\s*}}", replace_var, template)
+
+
+
+
+
+
 
 
 

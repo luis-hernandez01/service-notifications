@@ -7,7 +7,6 @@ class CredencialesCorreo(Base):
     
     
     id = Column(Integer, primary_key=True, index=True)
-    identificador = Column(String(255), unique=True, index=True)
     client_id = Column(String(255), nullable=False)
     client_secret = Column(String(255), nullable=False)
     tenant_id = Column(String(255), nullable=False)

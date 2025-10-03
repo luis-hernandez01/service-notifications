@@ -1,5 +1,5 @@
 from fastapi import Form, File, UploadFile
-from typing import List, Optional
+from typing import List, Optional, Union
 import json
 
 class EmailRequest:
@@ -12,6 +12,7 @@ class EmailRequest:
         cc: Optional[List[str]] = Form(None, description="Lista de correos en copia"),
         bcc: Optional[List[str]] = Form(None, description="Lista de correos en copia oculta"),
         # Adjuntos (archivos normales)
+        # adjuntos: Optional[List[UploadFile]] = File(None),
         adjuntos: Optional[List[UploadFile]] = File(None),
         # Imágenes embebidas (archivos que se referencian con cid)
         imagenes_embed: Optional[List[UploadFile]] = File(None),
@@ -19,7 +20,6 @@ class EmailRequest:
         self.identifying_name = identifying_name
         self.to = to
         self.subject = subject
-
         # body_html viene como string JSON → lo convertimos a dict
         try:
             self.body_html = json.loads(body_html)

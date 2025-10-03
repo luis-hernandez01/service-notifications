@@ -22,7 +22,8 @@ def get_all_credentials(db: Session, skip: int = 0, limit: int = 100):
 
 def create_credential(db: Session, data: CredentialsCreate):
     try: 
-        db_obj = CredencialesCorreo(**data.dict())
+        # db_obj = CredencialesCorreo(**data.dict())
+        db_obj = CredencialesCorreo(**data.model_dump())
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
@@ -36,7 +37,9 @@ def update_credential(db: Session, id: int, data: CredentialsUpdate):
         obj = get_credential_by_id(db, id)
         if not obj:
             raise HTTPException(status_code=404,detail=f"No se encontro ninguna credencial con el ID: {id}, por favor verifique la informacion")
-        for field, value in data.dict(exclude_unset=True).items():
+        for field, value in data.model_dump(exclude_unset=True).items():
+
+        # for field, value in data.dict(exclude_unset=True).items():
             setattr(obj, field, value)
         db.commit()
         db.refresh(obj)

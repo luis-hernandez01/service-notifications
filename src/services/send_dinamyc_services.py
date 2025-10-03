@@ -9,6 +9,7 @@ from src.models.plantilla_model import Plantillas
 from src.models.credenciales_model import CredencialesCorreo
 from src.models.logs_envio import LogsEnvio
 import shutil
+import json
 
 
 class SendDinamycO365Service:
@@ -44,10 +45,13 @@ class SendDinamycO365Service:
 
         self.username = creds.username
 
+  
     def validar_email(self, email: str) -> bool:
         """Valida sintaxis de email"""
+        import re
         patron = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
         return re.match(patron, email) is not None
+
 
     async def send(self, req: EmailRequest) -> dict:
         mailbox = self.account.mailbox(self.username)
@@ -117,6 +121,7 @@ class SendDinamycO365Service:
                 adjuntos_guardados = []
                 if req.adjuntos:
                     for adj in req.adjuntos:
+                        
                         destino = today_dir / adj.filename
                         with open(destino, "wb") as buffer:
                             shutil.copyfileobj(adj.file, buffer)
@@ -133,12 +138,9 @@ class SendDinamycO365Service:
                         with open(destino, "wb") as buffer:
                             shutil.copyfileobj(img.file, buffer)
 
-                        attachment = message.attachments.add(str(destino))
-                        if attachment:
-                            attachment.is_inline = True
-                            # usamos filename como cid
-                            attachment.content_id = img.filename
-                            imagenes_guardadas.append(f"{img.filename}:{destino}")
+                        message.attachments.add(str(destino))
+                        imagenes_guardadas.append(str(destino))
+                        
 
                 # Enviar
                 message.send()
@@ -174,7 +176,7 @@ class SendDinamycO365Service:
                     imagenes=";".join([img.filename for img in req.imagenes_embed]) if req.imagenes_embed else None,
                     num_imagenes=len(req.imagenes_embed) if req.imagenes_embed else 0,
                     asunto=req.subject,
-                    contenido=req.body_html,
+                    contenido=json.dumps(req.body_html, ensure_ascii=False),
                     estado="ERROR",
                     fecha_envio=datetime.utcnow(),
                     identificador=req.identifying_name,

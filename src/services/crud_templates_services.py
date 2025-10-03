@@ -25,7 +25,8 @@ def consult_notifications(db: Session,skip: int = 0, limit: int = 10):
 
 def create_notification(db: Session, notification: CreateNotification):
     try:
-        db_notification = Plantillas(**notification.dict())
+        # db_notification = Plantillas(**notification.dict())
+        db_notification = Plantillas(**notification.model_dump())
         db.add(db_notification)
         db.commit()
         db.refresh(db_notification)
@@ -42,7 +43,8 @@ def update_notification(id: int, data: UpdateNotification , db: Session):
         notification = get_template_by_id(id,db)
         if notification is None:
             raise HTTPException(status_code=404,detail=f"No se encontro notificacion con el ID: {id}, por favor verifique la informacion")
-        data_dict = data.dict(exclude_unset=True)
+        # data_dict = data.dict(exclude_unset=True)
+        data_dict = data.model_dump(exclude_unset=True)
         for campo, valor in data_dict.items():
             setattr(notification,campo,valor)
         db.commit()

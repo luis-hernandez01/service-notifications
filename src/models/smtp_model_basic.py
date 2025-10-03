@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional, Dict
 
 
@@ -19,16 +19,16 @@ class EmailRequest(BaseModel):
     adjuntos: Optional[List[str]] = Field(
         default=None,
         description="Lista de rutas absolutas o relativas de archivos adjuntos",
-        example=["/path/to/file.pdf", "docs/manual.docx"],
+        json_schema_extra={"logo123": "static/images/logo.png"}
     )
     imagenes_embed: Optional[Dict[str, str]] = Field(
         default=None,
         description="Diccionario con imágenes a embeber en el cuerpo del correo. "
-                    "Clave = Content-ID (cid), Valor = ruta al archivo de imagen.",
-        example={"logo123": "static/images/logo.png"},
+                    "Clave = Content-ID (cid), Valor = ruta al archivo de imagen."
+        
     )
 
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "identifying_name": "plantilla-notificacion",
@@ -38,11 +38,14 @@ class EmailRequest(BaseModel):
                                 "titulo": "Hola",
                                 "usuario": "Juan",
                                 "mensaje": "Este es un correo de prueba con parámetros dinámicos",
-                                "imagen": "cid:logo123"
+                                "imagen": "cid:logo123",
+                                "otp": "1234",
+                                "enlace_recuperacion": "https://www.invias.gov.co/"
                             },
                 "to": "usuario@dominio.com",
                 "cc": ["otro@dominio.com"],
                 "bcc": ["oculto@dominio.com"]
             }
         }
+    )
 
