@@ -124,9 +124,6 @@ class SmtpEmailService:
                 
                 
                 
-                
-                
-                
                 # Directorio de adjuntos
                 UPLOAD_DIR = Path("uploads/adjuntos")
                 today_dir = UPLOAD_DIR / datetime.today().strftime("%Y-%m-%d")
@@ -187,5 +184,5 @@ class SmtpEmailService:
                 self.db.commit()
                 raise HTTPException(status_code=500, detail=f"Error al enviar correo: {e}")
 
-        # await asyncio.to_thread(build_and_send)
-        # return {"status": "Procesado", "to": req.to}
+        await asyncio.to_thread(build_and_send)
+        return {"status": "Procesado", "to": req.to}
