@@ -14,7 +14,7 @@ router = APIRouter(tags=["Envio correo basico"])
 async def send_email(
     request: EmailRequest,
     db: Session = Depends(lambda: next(get_session(0))),
-    tokenpayload: dict = Depends(verify_jwt_token),
+    # tokenpayload: dict = Depends(verify_jwt_token),
 ):
     # Endpoint para enviar un correo usando O365.
     try:
