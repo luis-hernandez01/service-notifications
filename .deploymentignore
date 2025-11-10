@@ -1,0 +1,18 @@
+# Ignorar archivos de desarrollo local
+.env
+*.pyc
+__pycache__/
+*.swp
+
+# Ignorar carpetas específicas
+/local_data/
+/tests/
+/docs/
+/venv/
+venv/
+tests/
+docs/
+
+# Ignorar archivos de IDE
+.idea/
+.vscode/

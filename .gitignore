@@ -1,0 +1,8 @@
+.env
+/src/services/__pycache__
+/src/utils/__pycache__
+/src/models/__pycache__
+/src/config/__pycache__
+/src/api/endpoints/__pycache__
+/src/api/__pycache__
+/src/__pycache__
