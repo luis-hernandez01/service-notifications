@@ -225,7 +225,6 @@
 
 
 
-import asyncio
 import re
 import shutil
 from datetime import datetime
@@ -234,6 +233,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
+import requests
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -241,7 +241,6 @@ from src.models.credenciales_model import CredencialesCorreo
 from src.models.logs_envio import LogsEnvio
 from src.models.plantilla_model import Plantillas
 from src.models.smtp_model_basic import EmailRequest
-import requests
 
 
 class SmtpEmailService:
@@ -260,7 +259,7 @@ class SmtpEmailService:
                 detail=f"No se encontró la plantilla '{req.identifying_name}'",
             )
 
-        # Buscar credenciales (solo se usa para log)
+        # Buscar credenciales (solo para log)
         creds = (
             self.db.query(CredencialesCorreo)
             .filter(CredencialesCorreo.id == plantilla.credenciales_id)
@@ -275,12 +274,16 @@ class SmtpEmailService:
         self.user = creds.username
         self.plantilla = plantilla
 
+    # --------------------------
+    # MÉTODOS AUXILIARES
+    # --------------------------
     def validar_email(self, email: str) -> bool:
         patron = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
         return re.match(patron, email) is not None
 
     def render_template(self, template: str, variables: dict) -> str:
         """Reemplaza variables tipo {{campo}} o {{etiqueta.algo}}"""
+
         def dict_to_html(data: dict) -> str:
             html = "<ul>"
             for k, v in data.items():
@@ -314,100 +317,107 @@ class SmtpEmailService:
 
         return re.sub(r"{{\s*(.*?)\s*}}", replace_var, template)
 
+    # --------------------------
+    # MÉTODO PRINCIPAL (Render-compatible)
+    # --------------------------
     async def send(self, req: EmailRequest) -> dict:
-        """Envía correo usando el servicio externo (sin SMTP)"""
-        def build_and_send():
-            try:
-                # Preparar contenido HTML
-                contenido_html = (
-                    self.plantilla.content_html if self.plantilla else req.body_html
+        """Envía correo usando el servicio externo (sin SMTP), compatible con Render."""
+        try:
+            self.build_and_send(req)
+            return {"status": "Procesado", "to": req.to}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    def build_and_send(self, req: EmailRequest):
+        """Ejecuta el envío y guarda el log (versión síncrona segura para Render)."""
+        try:
+            # Preparar contenido HTML
+            contenido_html = (
+                self.plantilla.content_html if self.plantilla else req.body_html
+            )
+            if isinstance(req.body_html, dict):
+                contenido_html = self.render_template(
+                    self.plantilla.content_html, req.body_html
                 )
-                if isinstance(req.body_html, dict):
-                    contenido_html = self.render_template(
-                        self.plantilla.content_html, req.body_html
-                    )
 
-                # Validar correo destino
-                if not self.validar_email(req.to):
-                    raise HTTPException(status_code=400, detail=f"Correo inválido: {req.to}")
+            # Validar correo destino
+            if not self.validar_email(req.to):
+                raise HTTPException(status_code=400, detail=f"Correo inválido: {req.to}")
 
-                # Construir mensaje
-                msg = MIMEMultipart()
-                msg["From"] = self.user
-                msg["To"] = req.to
-                msg["Subject"] = req.subject
-                if req.cc:
-                    msg["Cc"] = ", ".join(req.cc)
-                if req.bcc:
-                    msg["Bcc"] = ", ".join(req.bcc)
-                msg.attach(MIMEText(contenido_html, "html"))
+            # Construir mensaje MIME (solo para referencia en logs)
+            msg = MIMEMultipart()
+            msg["From"] = self.user
+            msg["To"] = req.to
+            msg["Subject"] = req.subject
+            if req.cc:
+                msg["Cc"] = ", ".join(req.cc)
+            if req.bcc:
+                msg["Bcc"] = ", ".join(req.bcc)
+            msg.attach(MIMEText(contenido_html, "html"))
 
-                # Procesar adjuntos
-                UPLOAD_DIR = Path("uploads/adjuntos")
-                today_dir = UPLOAD_DIR / datetime.today().strftime("%Y-%m-%d")
-                today_dir.mkdir(parents=True, exist_ok=True)
+            # Procesar adjuntos
+            UPLOAD_DIR = Path("uploads/adjuntos")
+            today_dir = UPLOAD_DIR / datetime.today().strftime("%Y-%m-%d")
+            today_dir.mkdir(parents=True, exist_ok=True)
 
-                adjuntos_guardados = []
-                files = {}
+            adjuntos_guardados = []
+            files = {}
 
-                if req.adjuntos:
-                    for adj in req.adjuntos:
-                        path = Path(adj)
-                        if not path.exists():
-                            print(f"Adjunto no encontrado: {adj}")
-                            continue
-                        destino = today_dir / path.name
-                        shutil.copy(path, destino)
-                        adjuntos_guardados.append(str(destino))
-                        files[path.name] = open(path, "rb")
+            if req.adjuntos:
+                for adj in req.adjuntos:
+                    path = Path(adj)
+                    if not path.exists():
+                        print(f"Adjunto no encontrado: {adj}")
+                        continue
+                    destino = today_dir / path.name
+                    shutil.copy(path, destino)
+                    adjuntos_guardados.append(str(destino))
+                    files[path.name] = open(path, "rb")
 
-                # Enviar usando API externa
-                url = "https://email.serviciostic.net/"
-                data = {
-                    "para": req.to,
-                    "asunto": req.subject,
-                    "mensaje": contenido_html
-                }
+            # Enviar usando API externa
+            url = "https://email.serviciostic.net/"
+            data = {
+                "para": req.to,
+                "asunto": req.subject,
+                "mensaje": contenido_html,
+            }
 
-                respuesta = requests.post(url, data=data, files=files if files else None)
+            respuesta = requests.post(url, data=data, files=files if files else None)
 
-                if respuesta.status_code != 200:
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Error en servicio externo: {respuesta.text}"
-                    )
-
-                # Guardar log exitoso
-                log = LogsEnvio(
-                    destinatario=req.to,
-                    cc=";".join(req.cc) if req.cc else None,
-                    bcc=";".join(req.bcc) if req.bcc else None,
-                    adjuntos=";".join(adjuntos_guardados) if adjuntos_guardados else None,
-                    num_adjuntos=len(adjuntos_guardados),
-                    asunto=req.subject,
-                    contenido=contenido_html,
-                    estado="ENVIADO",
-                    fecha_envio=datetime.utcnow(),
-                    identificador=req.identifying_name,
-                    detalle=f"Correo enviado correctamente (serviciostic.net)",
+            if respuesta.status_code != 200:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error en servicio externo: {respuesta.text}",
                 )
-                self.db.add(log)
-                self.db.commit()
 
-            except Exception as e:
-                log = LogsEnvio(
-                    destinatario=req.to,
-                    asunto=req.subject,
-                    contenido=str(req.body_html),
-                    estado="ERROR",
-                    fecha_envio=datetime.utcnow(),
-                    identificador=req.identifying_name,
-                    detalle=str(e),
-                )
-                self.db.add(log)
-                self.db.commit()
-                raise HTTPException(status_code=500, detail=f"Error al enviar correo: {e}")
+            # Guardar log exitoso
+            log = LogsEnvio(
+                destinatario=req.to,
+                cc=";".join(req.cc) if req.cc else None,
+                bcc=";".join(req.bcc) if req.bcc else None,
+                adjuntos=";".join(adjuntos_guardados) if adjuntos_guardados else None,
+                num_adjuntos=len(adjuntos_guardados),
+                asunto=req.subject,
+                contenido=contenido_html,
+                estado="ENVIADO",
+                fecha_envio=datetime.utcnow(),
+                identificador=req.identifying_name,
+                detalle=f"Correo enviado correctamente (serviciostic.net)",
+            )
+            self.db.add(log)
+            self.db.commit()
 
-        await asyncio.to_thread(build_and_send)
-        return {"status": "Procesado", "to": req.to}
-
+        except Exception as e:
+            # Guardar log de error
+            log = LogsEnvio(
+                destinatario=req.to,
+                asunto=req.subject,
+                contenido=str(req.body_html),
+                estado="ERROR",
+                fecha_envio=datetime.utcnow(),
+                identificador=req.identifying_name,
+                detalle=str(e),
+            )
+            self.db.add(log)
+            self.db.commit()
+            raise HTTPException(status_code=500, detail=f"Error al enviar correo: {e}")
