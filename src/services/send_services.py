@@ -321,15 +321,20 @@ class SmtpEmailService:
     # MÉTODO PRINCIPAL (Render-compatible)
     # --------------------------
     async def send(self, req: EmailRequest) -> dict:
-        """Envía correo usando el servicio externo (sin SMTP), compatible con Render."""
+        """Envía correo usando servicio externo, compatible con Render (sin asyncio.to_thread)."""
         try:
             self.build_and_send(req)
             return {"status": "Procesado", "to": req.to}
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=f"Error general: {e}")
 
+    # --------------------------
+    # ENVÍO REAL + LOGS
+    # --------------------------
     def build_and_send(self, req: EmailRequest):
-        """Ejecuta el envío y guarda el log (versión síncrona segura para Render)."""
+        """Ejecuta el envío y guarda logs. Maneja errores de red en Render."""
         try:
             # Preparar contenido HTML
             contenido_html = (
@@ -344,7 +349,7 @@ class SmtpEmailService:
             if not self.validar_email(req.to):
                 raise HTTPException(status_code=400, detail=f"Correo inválido: {req.to}")
 
-            # Construir mensaje MIME (solo para referencia en logs)
+            # Construir mensaje MIME (solo para referencia/logs)
             msg = MIMEMultipart()
             msg["From"] = self.user
             msg["To"] = req.to
@@ -382,12 +387,37 @@ class SmtpEmailService:
                 "mensaje": contenido_html,
             }
 
-            respuesta = requests.post(url, data=data, files=files if files else None)
+            try:
+                respuesta = requests.post(
+                    url,
+                    data=data,
+                    files=files if files else None,
+                    timeout=15,  # evita bloqueos
+                    verify=True,  # fuerza HTTPS válido
+                )
 
-            if respuesta.status_code != 200:
+                if respuesta.status_code != 200:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error en servicio externo: {respuesta.text}",
+                    )
+
+            except requests.exceptions.ConnectionError:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Error en servicio externo: {respuesta.text}",
+                    detail="No se pudo conectar con el servicio externo (posible red bloqueada en Render).",
+                )
+
+            except requests.exceptions.Timeout:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Tiempo de espera excedido al contactar el servicio externo.",
+                )
+
+            except requests.exceptions.RequestException as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error de red al conectar con el servicio externo: {str(e)}",
                 )
 
             # Guardar log exitoso
@@ -407,6 +437,8 @@ class SmtpEmailService:
             self.db.add(log)
             self.db.commit()
 
+        except HTTPException:
+            raise
         except Exception as e:
             # Guardar log de error
             log = LogsEnvio(
